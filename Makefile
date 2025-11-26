@@ -1,0 +1,10 @@
+all: dfc dfs
+
+dfc: dfc.c 
+	gcc -Wall -Wextra -o dfc dfc.c
+
+dfs: dfs.c
+	gcc -Wall -Wextra -o dfs dfs.c
+
+clean:
+	rm -f dfc dfs *.o
