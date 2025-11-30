@@ -13,7 +13,6 @@
 #include <errno.h>
 #include <stdbool.h>
 
-
 #define BUFSIZE 1024
 
 // Global Variables
@@ -26,14 +25,24 @@ void error(const char *msg) {
 }
 
 
+
+/* ------------------------------------------------------
+    SENDER & ROUTER
+------------------------------------------------------ */
+
 int sender(struct sockaddr_in *clientaddr, int sockfd, char *buf, int buflen) {
-    int n = sendto(sockfd, buf, buflen, 0, (struct sockaddr *) clientaddr, sizeof(*clientaddr));
-    if (n < 0) {
+    ssize_t bytes_sent = send(sockfd, buf, buflen, 0); 
+    if (bytes_sent < 0) {
         perror("ERROR in sendto");
         return -1;
     }
-    return n;
+    return bytes_sent;
 }
+
+
+/* ------------------------------------------------------
+    COMMAND HANDLERS
+------------------------------------------------------ */
 
 int handle_list(struct sockaddr_in *clientaddr, int sockfd) {
 
@@ -126,6 +135,9 @@ int router(char *buf, int buflen, struct sockaddr_in *clientaddr, int sockfd) {
 }
 
 
+/* ------------------------------------------------------
+    MAIN
+------------------------------------------------------ */   
 int main(int argc, char *argv[]) {
     int sockfd, portno, n;
     int serverlen;
@@ -149,7 +161,7 @@ int main(int argc, char *argv[]) {
     closedir(dir);
 
     portno = atoi(argv[2]);
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
         error("ERROR opening socket");
     optval = 1;
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, 
@@ -162,21 +174,29 @@ int main(int argc, char *argv[]) {
              sizeof(serveraddr)) < 0) 
         error("ERROR on binding");
 
-    
+    if (listen(sockfd, 5) < 0)
+        error("ERROR on listen");
 
+    printf("DFS Server listening on port %d, serving directory: %s\n", portno, directory_path);
+    
 
 
 
     while(1) { 
         int clientlen = sizeof(clientaddr);
         char buf[BUFSIZE];
-        n = recvfrom(sockfd, buf, BUFSIZE, 0, 
-                     (struct sockaddr *) &clientaddr, &clientlen);
+        int clientfd = accept(sockfd, (struct sockaddr *) &clientaddr, (socklen_t *)&clientlen);
+        if (clientfd < 0) 
+            error("ERROR on accept");
+        // this is where you thread
+        bzero(buf, BUFSIZE);
+        n = recv(clientfd, buf, BUFSIZE, 0);
+        
         if (n < 0)
             error("ERROR in recvfrom");
         printf("server received %d bytes\n", n);
 
-        router(buf, n, &clientaddr, sockfd);
+        router(buf, n, &clientaddr, clientfd);
     }
 
 } 
